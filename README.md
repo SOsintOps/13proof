@@ -28,7 +28,7 @@ claude plugin install 13proof
 /13proof README.md
 
 # Or standalone:
-git clone https://github.com/sandro-rossetti/13proof.git
+git clone https://github.com/SOsintOps/13proof.git
 ./13proof.sh docs/README.md
 ```
 
@@ -69,15 +69,12 @@ The tool sends your document through a 6-stage pipeline where an AI model acts a
 ## The 6-Stage Pipeline
 
 ```
-  ┌─────────────┐   ┌─────────────┐   ┌─────────────┐
-  │  0. Evidence │──▶│  1. Safety   │──▶│  2. Code    │
-  │   Gathering  │   │ Transparency│   │    Sync     │
-  └─────────────┘   └─────────────┘   └──────┬──────┘
-                                              │
-  ┌─────────────┐   ┌─────────────┐   ┌──────▼──────┐
-  │  5. Final   │◀──│ 4. Multi-   │◀──│  3. MQM     │
-  │   Output    │   │ Perspective │   │   Quality   │
-  └─────────────┘   └─────────────┘   └─────────────┘
+ 0. Evidence       1. Safety &        2. Code
+    Gathering  --->   Transparency --->   Sync
+                                           |
+                                           v
+ 5. Final      <--- 4. Multi-      <--- 3. MQM
+    Output         Perspective        Quality
 ```
 
 **Stage 0 — Evidence Gathering.**
@@ -113,7 +110,7 @@ This adds `/13proof` and `/13proof-batch` as slash commands in your Claude Code 
 ### Manual (clone and use)
 
 ```bash
-git clone https://github.com/sandro-rossetti/13proof.git
+git clone https://github.com/SOsintOps/13proof.git
 cd 13proof
 chmod +x 13proof.sh
 ```

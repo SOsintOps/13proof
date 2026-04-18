@@ -4,7 +4,7 @@
   "description": "Document quality audit with a 6-stage pipeline powered by Claude. Produces corrected docs + traceable audit reports.",
   "author": "sandro",
   "license": "MIT",
-  "homepage": "https://github.com/sandro-rossetti/13proof",
+  "homepage": "https://github.com/SOsintOps/13proof",
   "skills": [
     {
       "name": "13proof",
