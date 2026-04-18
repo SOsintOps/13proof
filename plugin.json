@@ -1,0 +1,27 @@
+{
+  "name": "13proof",
+  "version": "1.0.0",
+  "description": "Document quality audit with a 6-stage pipeline powered by Claude. Produces corrected docs + traceable audit reports.",
+  "author": "sandro",
+  "license": "MIT",
+  "homepage": "https://github.com/sandro-rossetti/13proof",
+  "skills": [
+    {
+      "name": "13proof",
+      "description": "Run a 6-stage document audit: Evidence Gathering, Safety & Transparency, Code-Sync, MQM Quality, Multi-Perspective Review, Final Output with traceable corrections.",
+      "path": ".claude/skills/proofread"
+    }
+  ],
+  "commands": [
+    {
+      "name": "13proof",
+      "description": "Audit a document with the 6-stage 13proof pipeline",
+      "path": ".claude/commands/13proof.md"
+    },
+    {
+      "name": "13proof-batch",
+      "description": "Audit all markdown files in the current project",
+      "path": ".claude/commands/13proof-batch.md"
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+# ─────────────────────────────────────────────────────────────────────────────
+#  Example: Minimal Italian project config
+# ─────────────────────────────────────────────────────────────────────────────
+
+language: it
+severity_threshold: major
+output_formats:
+  - markdown
+ci_fail_threshold: 80
+generate_corrected: true
+
+stages:
+  safety:
+    check_secrets: true
+    check_ai_disclosure: false
+  code_sync:
+    validate_syntax: true
+    cross_reference: false

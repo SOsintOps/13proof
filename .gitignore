@@ -1,0 +1,7 @@
+node_modules/
+.proofread-history/
+*_proofread.*
+*_audit_report.*
+batch_audit_summary.md
+.DS_Store
+*.log

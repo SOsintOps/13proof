@@ -1,0 +1,96 @@
+# ─────────────────────────────────────────────────────────────────────────────
+#  .proofreadrc.yaml — Proofreader Audit Configuration
+#  Place in project root or ~/.proofreadrc.yaml for global defaults
+# ─────────────────────────────────────────────────────────────────────────────
+
+# AI Engine
+# "auto" = detect what's installed (prefers claude, falls back to gemini)
+# Or force: "claude", "gemini"
+engine: auto
+
+# Model override (optional — leave empty to use engine default)
+# Claude defaults: claude-opus-4-6 | Gemini defaults: gemini-2.5-pro
+# model: ""
+
+# Language for the audit report
+# "auto" = detect from document content (default)
+# Or force: "it", "en", "de", "fr", "es", etc.
+language: auto
+
+# Minimum severity to include in reports
+# Options: "all" (default), "minor", "major", "critical"
+severity_threshold: all
+
+# MQM categories to evaluate
+# Remove any category you want to skip
+categories:
+  - accuracy
+  - fluency
+  - terminology
+  - style
+  - completeness
+
+# Categories to ignore (overrides 'categories' above)
+# Example: ignore_categories: [style, completeness]
+ignore_categories: []
+
+# Output formats to generate
+# Available: markdown, json, html
+output_formats:
+  - markdown
+  - json
+  - html
+
+# Output directory for reports
+# "auto" = same directory as the source file (default)
+# Or specify a path: "./reports" or "/absolute/path"
+output_dir: auto
+
+# Quality score threshold for CI/CD
+# Pipeline fails if score is below this value (0-100)
+# Set to 0 to never fail on quality score
+ci_fail_threshold: 70
+
+# Corrected document generation
+# true = generate [name]_proofread.[ext] with corrections applied
+generate_corrected: true
+
+# Stage-specific configuration
+stages:
+  # Stage 1: Safety & Transparency
+  safety:
+    # Check for exposed secrets (API keys, tokens, passwords)
+    check_secrets: true
+    # Check for AI transparency disclosure
+    check_ai_disclosure: false
+    # Custom secret patterns (regex)
+    custom_patterns: []
+
+  # Stage 2: Code Synchronization
+  code_sync:
+    # Validate code block syntax
+    validate_syntax: true
+    # Cross-reference with source files
+    cross_reference: true
+    # File extensions to consider as source files
+    source_extensions: [".js", ".ts", ".py", ".sh", ".go", ".rs", ".java"]
+
+  # Stage 4: Multi-Perspective Review
+  multi_perspective:
+    # Require N/3 consensus for findings (default: 2)
+    consensus_threshold: 2
+
+# Paths to exclude from batch processing
+exclude_paths:
+  - node_modules/
+  - .git/
+  - dist/
+  - build/
+  - vendor/
+  - "*_proofread.*"
+  - "*_audit_report.*"
+
+# History tracking
+# When enabled, saves audit results to .proofread-history/ for trend analysis
+track_history: false
+history_dir: .proofread-history

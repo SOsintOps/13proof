@@ -1,0 +1,208 @@
+name: Proofread Audit
+
+on:
+  pull_request:
+    paths:
+      - '**/*.md'
+      - '**/*.txt'
+      - '**/*.rst'
+
+  # Manual trigger
+  workflow_dispatch:
+    inputs:
+      files:
+        description: 'Space-separated list of files to audit (empty = changed files only)'
+        required: false
+        default: ''
+      engine:
+        description: 'AI engine: claude or gemini'
+        required: false
+        default: 'claude'
+      model:
+        description: 'Model to use (leave empty for engine default)'
+        required: false
+        default: ''
+      threshold:
+        description: 'Minimum quality score (0-100, 0 = no threshold)'
+        required: false
+        default: '70'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  NOTE: API key is needed ONLY here in CI/CD, because there is no logged-in
+#  user session. When you use the plugin locally inside Claude Code or Gemini
+#  CLI, your existing authentication handles everything — no key needed.
+#
+#  Set ONE of these in Settings → Secrets → Actions:
+#    ANTHROPIC_API_KEY  (for Claude engine)
+#    GEMINI_API_KEY     (for Gemini engine)
+# ─────────────────────────────────────────────────────────────────────────────
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Determine engine
+        id: engine
+        run: |
+          ENGINE="${{ github.event.inputs.engine || 'claude' }}"
+          echo "name=${ENGINE}" >> "$GITHUB_OUTPUT"
+
+          if [ "$ENGINE" = "claude" ]; then
+            MODEL="${{ github.event.inputs.model || 'claude-sonnet-4-6' }}"
+          else
+            MODEL="${{ github.event.inputs.model || 'gemini-2.5-pro' }}"
+          fi
+          echo "model=${MODEL}" >> "$GITHUB_OUTPUT"
+
+      - name: Install AI CLI
+        run: |
+          if [ "${{ steps.engine.outputs.name }}" = "claude" ]; then
+            npm install -g @anthropic-ai/claude-code
+          else
+            npm install -g @anthropic-ai/gemini-cli
+          fi
+
+      - name: Determine files to audit
+        id: files
+        run: |
+          if [ -n "${{ github.event.inputs.files }}" ]; then
+            echo "list=${{ github.event.inputs.files }}" >> "$GITHUB_OUTPUT"
+          else
+            CHANGED=$(git diff --name-only origin/${{ github.base_ref }}...HEAD -- '*.md' '*.txt' '*.rst' | grep -v '_proofread\.' | grep -v '_audit_report\.' || true)
+            echo "list=${CHANGED}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run Proofread Audit
+        id: audit
+        if: steps.files.outputs.list != ''
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          ENGINE="${{ steps.engine.outputs.name }}"
+          MODEL="${{ steps.engine.outputs.model }}"
+          THRESHOLD="${{ github.event.inputs.threshold || '70' }}"
+          RESULTS_DIR="$(mktemp -d)"
+          FAILED=false
+          COMMENT_BODY="## Proofread Audit Report\n\n"
+          COMMENT_BODY="${COMMENT_BODY}Engine: \`${ENGINE}\` | Model: \`${MODEL}\` | Threshold: ${THRESHOLD}\n\n"
+
+          AUDIT_PROMPT='You are a document auditor. Audit the file using the 6-stage pipeline:
+          Stage 0: Evidence Gathering (index structure, terminology, code blocks)
+          Stage 1: Safety (secrets, AI disclosure, bias)
+          Stage 2: Code Sync (validate code blocks vs source)
+          Stage 3: MQM Quality (accuracy, fluency, terminology, style, completeness)
+          Stage 4: Multi-Perspective (architect + writer + compliance, 2/3 consensus)
+          Stage 5: Output
+
+          Respond ONLY with valid JSON:
+          {"file": "<path>", "score": <0-100>, "critical": <n>, "major": <n>, "minor": <n>, "findings": [{"id": "F001", "stage": <0-5>, "category": "<cat>", "severity": "<critical|major|minor>", "line": <n>, "description": "<text>", "correction": "<text>"}], "summary": "<1-2 sentences>"}'
+
+          for FILE in ${{ steps.files.outputs.list }}; do
+            [ ! -f "$FILE" ] && continue
+
+            echo "::group::Auditing $FILE"
+
+            BASENAME=$(basename "$FILE" | sed 's/\.[^.]*$//')
+            REPORT_JSON="${RESULTS_DIR}/${BASENAME}_audit_report.json"
+
+            FILE_PROMPT="Audit this file: ${FILE}. ${AUDIT_PROMPT}"
+
+            # Run with the selected engine
+            if [ "$ENGINE" = "claude" ]; then
+              claude --model "$MODEL" --print "$FILE_PROMPT" > "$REPORT_JSON" 2>/dev/null || true
+            else
+              gemini --model "$MODEL" --print "$FILE_PROMPT" > "$REPORT_JSON" 2>/dev/null || true
+            fi
+
+            # Parse results
+            SCORE=$(python3 -c "
+          import json, sys
+          try:
+              data = json.load(open('$REPORT_JSON'))
+              print(data.get('score', 0))
+          except:
+              print(0)
+          " 2>/dev/null || echo "0")
+
+            CRITICAL=$(python3 -c "
+          import json
+          try: print(json.load(open('$REPORT_JSON')).get('critical', '?'))
+          except: print('?')
+          " 2>/dev/null || echo "?")
+
+            MAJOR=$(python3 -c "
+          import json
+          try: print(json.load(open('$REPORT_JSON')).get('major', '?'))
+          except: print('?')
+          " 2>/dev/null || echo "?")
+
+            SUMMARY=$(python3 -c "
+          import json
+          try: print(json.load(open('$REPORT_JSON')).get('summary', 'No summary'))
+          except: print('Audit failed')
+          " 2>/dev/null || echo "Error")
+
+            if [ "$SCORE" -ge 80 ] 2>/dev/null; then
+              ICON="✅"
+            elif [ "$SCORE" -ge "$THRESHOLD" ] 2>/dev/null; then
+              ICON="⚠️"
+            else
+              ICON="❌"
+              FAILED=true
+            fi
+
+            COMMENT_BODY="${COMMENT_BODY}### ${ICON} \`${FILE}\` — Score: ${SCORE}/100\n"
+            COMMENT_BODY="${COMMENT_BODY}Critical: ${CRITICAL} | Major: ${MAJOR}\n"
+            COMMENT_BODY="${COMMENT_BODY}${SUMMARY}\n\n"
+
+            echo "::endgroup::"
+          done
+
+          COMMENT_BODY="${COMMENT_BODY}---\n*Generated by [13proof](https://github.com/sandro-rossetti/13proof)*"
+
+          echo -e "$COMMENT_BODY" > "${RESULTS_DIR}/comment.md"
+          echo "results_dir=${RESULTS_DIR}" >> "$GITHUB_OUTPUT"
+
+          if [ "$FAILED" = true ]; then
+            echo "::error::One or more files scored below the threshold of ${THRESHOLD}"
+            echo "failed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Comment on PR
+        if: github.event_name == 'pull_request' && steps.files.outputs.list != ''
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const resultsDir = '${{ steps.audit.outputs.results_dir || '/tmp' }}';
+            const commentFile = `${resultsDir}/comment.md`;
+            if (fs.existsSync(commentFile)) {
+              const body = fs.readFileSync(commentFile, 'utf8');
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: body
+              });
+            }
+
+      - name: Check threshold
+        if: steps.audit.outputs.failed == 'true'
+        run: exit 1

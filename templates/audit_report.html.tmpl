@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Proofread Audit Report — {{FILE}}</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --surface: #1e293b;
+      --border: #334155;
+      --text: #e2e8f0;
+      --text-dim: #94a3b8;
+      --accent: #3b82f6;
+      --green: #22c55e;
+      --yellow: #eab308;
+      --red: #ef4444;
+      --orange: #f97316;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding: 2rem;
+      line-height: 1.6;
+    }
+    .container { max-width: 960px; margin: 0 auto; }
+    h1 { font-size: 1.5rem; margin-bottom: 0.5rem; }
+    .meta { color: var(--text-dim); font-size: 0.875rem; margin-bottom: 2rem; }
+
+    /* Score gauge */
+    .score-section { text-align: center; margin: 2rem 0; }
+    .score-ring {
+      width: 160px; height: 160px;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2.5rem;
+      font-weight: 700;
+      position: relative;
+    }
+    .score-ring::before {
+      content: '';
+      position: absolute;
+      inset: 8px;
+      border-radius: 50%;
+      background: var(--bg);
+    }
+    .score-ring span { position: relative; z-index: 1; }
+    .score-good { background: conic-gradient(var(--green) calc(var(--pct) * 1%), var(--border) 0); }
+    .score-ok { background: conic-gradient(var(--yellow) calc(var(--pct) * 1%), var(--border) 0); }
+    .score-bad { background: conic-gradient(var(--red) calc(var(--pct) * 1%), var(--border) 0); }
+    .score-label { color: var(--text-dim); margin-top: 0.5rem; font-size: 0.875rem; }
+
+    /* Summary cards */
+    .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin: 2rem 0; }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.25rem;
+      text-align: center;
+    }
+    .card .count { font-size: 2rem; font-weight: 700; }
+    .card .label { color: var(--text-dim); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; }
+    .card.critical .count { color: var(--red); }
+    .card.major .count { color: var(--orange); }
+    .card.minor .count { color: var(--yellow); }
+
+    /* Findings table */
+    .findings { margin: 2rem 0; }
+    .findings h2 { font-size: 1.1rem; margin-bottom: 1rem; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td {
+      text-align: left;
+      padding: 0.75rem;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.875rem;
+    }
+    th {
+      background: var(--surface);
+      color: var(--text-dim);
+      font-weight: 600;
+      text-transform: uppercase;
+      font-size: 0.75rem;
+      letter-spacing: 0.05em;
+      cursor: pointer;
+    }
+    th:hover { color: var(--accent); }
+    tr:hover td { background: rgba(59, 130, 246, 0.05); }
+    .severity-critical { color: var(--red); font-weight: 600; }
+    .severity-major { color: var(--orange); font-weight: 600; }
+    .severity-minor { color: var(--yellow); }
+
+    /* Category breakdown */
+    .categories { margin: 2rem 0; }
+    .categories h2 { font-size: 1.1rem; margin-bottom: 1rem; }
+    .bar-chart { display: flex; flex-direction: column; gap: 0.5rem; }
+    .bar-row { display: flex; align-items: center; gap: 0.75rem; }
+    .bar-label { width: 120px; font-size: 0.8rem; color: var(--text-dim); text-align: right; }
+    .bar-track { flex: 1; height: 24px; background: var(--surface); border-radius: 6px; overflow: hidden; }
+    .bar-fill { height: 100%; border-radius: 6px; display: flex; align-items: center; padding: 0 0.5rem; font-size: 0.75rem; font-weight: 600; min-width: fit-content; }
+    .bar-fill.accuracy { background: var(--red); }
+    .bar-fill.fluency { background: var(--orange); }
+    .bar-fill.terminology { background: var(--yellow); }
+    .bar-fill.style { background: var(--accent); }
+    .bar-fill.completeness { background: #8b5cf6; }
+
+    /* Footer */
+    .footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--border); color: var(--text-dim); font-size: 0.75rem; text-align: center; }
+    .footer a { color: var(--accent); text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Proofread Audit Report</h1>
+    <div class="meta">
+      <code>{{FILE}}</code> &middot; {{DATE}} &middot; Model: {{MODEL}} &middot; Config: {{CONFIG}}
+    </div>
+
+    <div class="score-section">
+      <div class="score-ring {{SCORE_CLASS}}" style="--pct: {{SCORE}}">
+        <span>{{SCORE}}</span>
+      </div>
+      <div class="score-label">Quality Score</div>
+    </div>
+
+    <div class="cards">
+      <div class="card critical">
+        <div class="count">{{CRITICAL}}</div>
+        <div class="label">Critical</div>
+      </div>
+      <div class="card major">
+        <div class="count">{{MAJOR}}</div>
+        <div class="label">Major</div>
+      </div>
+      <div class="card minor">
+        <div class="count">{{MINOR}}</div>
+        <div class="label">Minor</div>
+      </div>
+    </div>
+
+    <div class="findings">
+      <h2>Detailed Findings</h2>
+      <table id="findingsTable">
+        <thead>
+          <tr>
+            <th onclick="sortTable(0)">ID</th>
+            <th onclick="sortTable(1)">Stage</th>
+            <th onclick="sortTable(2)">Category</th>
+            <th onclick="sortTable(3)">Severity</th>
+            <th onclick="sortTable(4)">Line</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{FINDINGS_ROWS}}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="categories">
+      <h2>Category Breakdown</h2>
+      <div class="bar-chart">
+        {{CATEGORY_BARS}}
+      </div>
+    </div>
+
+    <div class="footer">
+      Generated by <a href="https://github.com/sandro-rossetti/13proof">13proof</a> v{{VERSION}}
+    </div>
+  </div>
+
+  <script>
+    function sortTable(col) {
+      const table = document.getElementById('findingsTable');
+      const rows = Array.from(table.tBodies[0].rows);
+      const asc = table.dataset.sortCol == col ? !(table.dataset.sortAsc === 'true') : true;
+      rows.sort((a, b) => {
+        const va = a.cells[col].textContent.trim();
+        const vb = b.cells[col].textContent.trim();
+        return asc ? va.localeCompare(vb, undefined, {numeric: true}) : vb.localeCompare(va, undefined, {numeric: true});
+      });
+      rows.forEach(r => table.tBodies[0].appendChild(r));
+      table.dataset.sortCol = col;
+      table.dataset.sortAsc = asc;
+    }
+  </script>
+</body>
+</html>
