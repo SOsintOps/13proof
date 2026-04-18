@@ -68,14 +68,7 @@ The tool sends your document through a 6-stage pipeline where an AI model acts a
 
 ## The 6-Stage Pipeline
 
-```
- 0. Evidence       1. Safety &        2. Code
-    Gathering  --->   Transparency --->   Sync
-                                           |
-                                           v
- 5. Final      <--- 4. Multi-      <--- 3. MQM
-    Output         Perspective        Quality
-```
+![13proof audit pipeline](assets/pipeline.png)
 
 **Stage 0 — Evidence Gathering.**
 The AI reads the document and builds an internal map: headings, sections, terminology, code blocks, references to external files. This map becomes the source of truth for all subsequent stages. Every finding must cite a specific line or section.
