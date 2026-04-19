@@ -116,7 +116,10 @@ jobs:
 
           IFS=$'\n'
           for FILE in ${{ steps.files.outputs.list }}; do
-            [ ! -f "$FILE" ] && continue
+            if [ ! -f "$FILE" ]; then
+              echo "::warning::File not found, skipping: $FILE"
+              continue
+            fi
 
             echo "::group::Auditing $FILE"
 

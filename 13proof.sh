@@ -66,12 +66,19 @@ MODEL=""
 OUTPUT_DIR=""
 FORMAT="md"
 
+require_arg() {
+  if [[ $# -lt 2 || "$2" == --* ]]; then
+    echo -e "${RED}Errore:${RESET} $1 richiede un valore."
+    exit 1
+  fi
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --engine)    ENGINE="$2"; shift 2 ;;
-    --model)     MODEL="$2"; shift 2 ;;
-    --output)    OUTPUT_DIR="$2"; shift 2 ;;
-    --format)    FORMAT="$2"; shift 2 ;;
+    --engine)    require_arg "$1" "${2:-}"; ENGINE="$2"; shift 2 ;;
+    --model)     require_arg "$1" "${2:-}"; MODEL="$2"; shift 2 ;;
+    --output)    require_arg "$1" "${2:-}"; OUTPUT_DIR="$2"; shift 2 ;;
+    --format)    require_arg "$1" "${2:-}"; FORMAT="$2"; shift 2 ;;
     --version)   echo "13proof.sh v${VERSION}"; exit 0 ;;
     --help|-h)   usage ;;
     -*)          echo -e "${RED}Flag sconosciuto: $1${RESET}"; usage ;;
@@ -91,6 +98,26 @@ if [[ ! -f "${TARGET_FILE}" ]]; then
   echo -e "${RED}Errore:${RESET} file '${TARGET_FILE}' non trovato."
   exit 1
 fi
+
+if [[ ! -s "${TARGET_FILE}" ]]; then
+  echo -e "${RED}Errore:${RESET} file '${TARGET_FILE}' è vuoto."
+  exit 1
+fi
+
+# Controlla che non sia un file binario
+if file --mime-encoding "${TARGET_FILE}" 2>/dev/null | grep -q "binary"; then
+  echo -e "${RED}Errore:${RESET} '${TARGET_FILE}' è un file binario. 13proof funziona solo con file di testo."
+  exit 1
+fi
+
+# Validazione formato
+case "${FORMAT}" in
+  md|json|html|all) ;;
+  *)
+    echo -e "${RED}Errore:${RESET} formato '${FORMAT}' non valido. Usa: md, json, html, all"
+    exit 1
+    ;;
+esac
 
 # Engine: se non specificato, auto-detect
 if [[ -z "${ENGINE}" ]]; then
@@ -133,6 +160,12 @@ load_config_value() {
   grep -E "^${key}:" "$file" 2>/dev/null | head -1 | sed "s/^${key}:[[:space:]]*//" | sed 's/#.*//' | xargs
 }
 
+load_config_list_first() {
+  # Reads first item from a YAML list (e.g., output_formats:\n  - markdown)
+  local key="$1" file="$2"
+  sed -n "/^${key}:/,/^[^ ]/p" "$file" 2>/dev/null | grep -E '^\s+-\s+' | head -1 | sed 's/^[[:space:]]*-[[:space:]]*//' | xargs
+}
+
 CONFIG_FILE=""
 if [[ -f ".proofreadrc.yaml" ]]; then
   CONFIG_FILE=".proofreadrc.yaml"
@@ -145,8 +178,16 @@ if [[ -n "${CONFIG_FILE}" ]]; then
 
   # Solo sovrascrive se non specificato da CLI
   cfg_engine=$(load_config_value "engine" "${CONFIG_FILE}")
-  cfg_format=$(load_config_value "default_format" "${CONFIG_FILE}")
   cfg_threshold=$(load_config_value "ci_fail_threshold" "${CONFIG_FILE}")
+
+  # output_formats è una lista YAML — legge il primo valore
+  cfg_format=$(load_config_list_first "output_formats" "${CONFIG_FILE}")
+  # Mappa nomi estesi -> abbreviazioni usate dal script
+  case "${cfg_format}" in
+    markdown) cfg_format="md" ;;
+    json|html|all) ;;  # già validi
+    *) cfg_format="" ;;
+  esac
 
   [[ -z "${ENGINE}" && -n "${cfg_engine}" && "${cfg_engine}" != "auto" ]] && ENGINE="${cfg_engine}"
   [[ "${FORMAT}" == "md" && -n "${cfg_format}" ]] && FORMAT="${cfg_format}"
