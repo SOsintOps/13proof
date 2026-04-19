@@ -1,4 +1,4 @@
-# Proofreader Audit — /proofread
+# 13proof — Document Quality Audit
 
 Run the 13proof skill on the specified file: **$ARGUMENTS**
 

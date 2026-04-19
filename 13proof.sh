@@ -126,6 +126,32 @@ case "${ENGINE}" in
     ;;
 esac
 
+# ── Carica .proofreadrc.yaml (se presente) ──────────────────────────────────
+
+load_config_value() {
+  local key="$1" file="$2"
+  grep -E "^${key}:" "$file" 2>/dev/null | head -1 | sed "s/^${key}:[[:space:]]*//" | sed 's/#.*//' | xargs
+}
+
+CONFIG_FILE=""
+if [[ -f ".proofreadrc.yaml" ]]; then
+  CONFIG_FILE=".proofreadrc.yaml"
+elif [[ -f "${HOME}/.proofreadrc.yaml" ]]; then
+  CONFIG_FILE="${HOME}/.proofreadrc.yaml"
+fi
+
+if [[ -n "${CONFIG_FILE}" ]]; then
+  echo -e "  ${DIM}Config: ${CONFIG_FILE}${RESET}"
+
+  # Solo sovrascrive se non specificato da CLI
+  cfg_engine=$(load_config_value "engine" "${CONFIG_FILE}")
+  cfg_format=$(load_config_value "default_format" "${CONFIG_FILE}")
+  cfg_threshold=$(load_config_value "ci_fail_threshold" "${CONFIG_FILE}")
+
+  [[ -z "${ENGINE}" && -n "${cfg_engine}" && "${cfg_engine}" != "auto" ]] && ENGINE="${cfg_engine}"
+  [[ "${FORMAT}" == "md" && -n "${cfg_format}" ]] && FORMAT="${cfg_format}"
+fi
+
 # Model: se non specificato, usa default per engine
 [[ -z "${MODEL}" ]] && MODEL=$(default_model_for "${ENGINE}")
 
@@ -146,7 +172,7 @@ REPORT_HTML="${DIR}/${NAME}_audit_report.html"
 
 echo ""
 echo -e "${BOLD}╔══════════════════════════════════════════════════════╗${RESET}"
-echo -e "${BOLD}║   Proofreader Audit v${VERSION}                          ║${RESET}"
+echo -e "${BOLD}║   13proof v${VERSION}                                    ║${RESET}"
 echo -e "${BOLD}╚══════════════════════════════════════════════════════╝${RESET}"
 echo ""
 echo -e "  ${CYAN}File:${RESET}     ${TARGET_FILE}"
@@ -222,10 +248,10 @@ echo ""
 
 case "${ENGINE}" in
   claude)
-    claude --model "${MODEL}" --print "${FULL_PROMPT}" 2>&1
+    claude -p "${FULL_PROMPT}" --model "${MODEL}" 2>&1
     ;;
   gemini)
-    gemini --model "${MODEL}" --print "${FULL_PROMPT}" 2>&1
+    gemini -p "${FULL_PROMPT}" --model "${MODEL}" 2>&1
     ;;
 esac
 

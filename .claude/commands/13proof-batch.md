@@ -1,4 +1,4 @@
-# Proofreader Audit — Batch Mode
+# 13proof — Batch Mode
 
 Run the 13proof on all markdown files in the current project.
 

@@ -114,6 +114,7 @@ jobs:
           Respond ONLY with valid JSON:
           {"file": "<path>", "score": <0-100>, "critical": <n>, "major": <n>, "minor": <n>, "findings": [{"id": "F001", "stage": <0-5>, "category": "<cat>", "severity": "<critical|major|minor>", "line": <n>, "description": "<text>", "correction": "<text>"}], "summary": "<1-2 sentences>"}'
 
+          IFS=$'\n'
           for FILE in ${{ steps.files.outputs.list }}; do
             [ ! -f "$FILE" ] && continue
 
@@ -126,38 +127,36 @@ jobs:
 
             # Run with the selected engine
             if [ "$ENGINE" = "claude" ]; then
-              claude --model "$MODEL" --print "$FILE_PROMPT" > "$REPORT_JSON" 2>/dev/null || true
+              claude -p "$FILE_PROMPT" --model "$MODEL" > "$REPORT_JSON" 2>/dev/null
             else
-              gemini --model "$MODEL" --print "$FILE_PROMPT" > "$REPORT_JSON" 2>/dev/null || true
+              gemini -p "$FILE_PROMPT" --model "$MODEL" > "$REPORT_JSON" 2>/dev/null
             fi
 
-            # Parse results
-            SCORE=$(python3 -c "
+            if [ $? -ne 0 ] || [ ! -s "$REPORT_JSON" ]; then
+              echo "::warning::Audit failed for $FILE"
+              SCORE=0; CRITICAL="?"; MAJOR="?"; SUMMARY="Audit failed"
+            else
+              # Parse results safely via temp Python script
+              read SCORE CRITICAL MAJOR <<< "$(python3 -c "
           import json, sys
           try:
-              data = json.load(open('$REPORT_JSON'))
-              print(data.get('score', 0))
-          except:
-              print(0)
-          " 2>/dev/null || echo "0")
+              with open(sys.argv[1]) as f:
+                  data = json.load(f)
+              print(data.get('score', 0), data.get('critical', '?'), data.get('major', '?'))
+          except (json.JSONDecodeError, FileNotFoundError, KeyError):
+              print('0 ? ?')
+          " "$REPORT_JSON" 2>/dev/null || echo "0 ? ?")"
 
-            CRITICAL=$(python3 -c "
-          import json
-          try: print(json.load(open('$REPORT_JSON')).get('critical', '?'))
-          except: print('?')
-          " 2>/dev/null || echo "?")
-
-            MAJOR=$(python3 -c "
-          import json
-          try: print(json.load(open('$REPORT_JSON')).get('major', '?'))
-          except: print('?')
-          " 2>/dev/null || echo "?")
-
-            SUMMARY=$(python3 -c "
-          import json
-          try: print(json.load(open('$REPORT_JSON')).get('summary', 'No summary'))
-          except: print('Audit failed')
-          " 2>/dev/null || echo "Error")
+              SUMMARY="$(python3 -c "
+          import json, sys
+          try:
+              with open(sys.argv[1]) as f:
+                  data = json.load(f)
+              print(data.get('summary', 'No summary'))
+          except (json.JSONDecodeError, FileNotFoundError, KeyError):
+              print('Audit completed')
+          " "$REPORT_JSON" 2>/dev/null || echo "Error")"
+            fi
 
             if [ "$SCORE" -ge 80 ] 2>/dev/null; then
               ICON="✅"
